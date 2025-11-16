@@ -10,6 +10,11 @@
   type="module"
   fetchpriority="low"
 ></script>
+<script
+  src="{{ 'line-item-note.js' | asset_url }}"
+  type="module"
+  fetchpriority="low"
+></script>
 
 <div
   {{ block.shopify_attributes }}
@@ -324,6 +329,28 @@
                       {% render 'unit-price', price: unit_price, measurement: item.unit_price_measurement %}
                     </div>
                   {%- endif -%}
+                </td>
+              </tr>
+              <!-- Line Item Note Row -->
+              <tr class="cart-items__table-row cart-items__note-row" data-line-index="{{ item.index | plus: 1 }}">
+                <td colspan="4" class="cart-items__note-cell">
+                  <line-item-note data-line-index="{{ item.index | plus: 1 }}">
+                    <div class="line-item-note__wrapper">
+                      <label for="line-item-note-{{ item.index }}" class="line-item-note__label">
+                        Add a note (gift message, engraving, etc.)
+                      </label>
+                      <textarea
+                        id="line-item-note-{{ item.index }}"
+                        class="line-item-note__textarea"
+                        placeholder="Add your message or special instructions..."
+                        maxlength="500"
+                      >{% if item.properties._note %}{{ item.properties._note }}{% endif %}</textarea>
+                      <div class="line-item-note__footer">
+                        <small class="line-item-note__char-count"><span class="current-count">{% if item.properties._note %}{{ item.properties._note | size }}{% else %}0{% endif %}</span>/500</small>
+                        <span class="line-item-note__save-indicator" aria-hidden="true">✓ Saved</span>
+                      </div>
+                    </div>
+                  </line-item-note>
                 </td>
               </tr>
             {% endfor %}
@@ -766,5 +793,90 @@
   .cart-items__properties dt,
   .cart-items__properties dd {
     display: inline;
+  }
+
+  /* Line Item Note Styles */
+  .cart-items__note-row {
+    background-color: rgba(0, 0, 0, 0.02);
+  }
+
+  .cart-items__note-cell {
+    padding: 1rem;
+  }
+
+  line-item-note {
+    display: block;
+  }
+
+  .line-item-note__wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .line-item-note__label {
+    display: block;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-text, #333);
+    margin-bottom: 0.25rem;
+  }
+
+  .line-item-note__textarea {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid var(--color-border, #ddd);
+    border-radius: 4px;
+    font-size: 0.875rem;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 80px;
+    max-height: 150px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .line-item-note__textarea:focus {
+    outline: none;
+    border-color: var(--color-focus, #000);
+    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.05);
+  }
+
+  .line-item-note__textarea::placeholder {
+    color: var(--color-text-secondary, #999);
+  }
+
+  .line-item-note__footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.75rem;
+    color: var(--color-text-secondary, #999);
+  }
+
+  .line-item-note__char-count {
+    display: block;
+  }
+
+  .line-item-note__save-indicator {
+    color: var(--color-success, #22863a);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    font-weight: 500;
+  }
+
+  .line-item-note__save-indicator.saved {
+    opacity: 1;
+  }
+
+  @media (max-width: 768px) {
+    .cart-items__note-cell {
+      padding: 0.75rem;
+    }
+
+    .line-item-note__textarea {
+      min-height: 70px;
+      padding: 0.5rem;
+      font-size: 0.8125rem;
+    }
   }
 {% endstylesheet %}

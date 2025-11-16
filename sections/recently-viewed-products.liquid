@@ -1,0 +1,367 @@
+<script src="{{ 'recently-viewed-products.js' | asset_url }}" type="module" defer></script>
+
+<script type="module" defer>
+  import { RecentlyViewed } from '{{ 'recently-viewed-products.js' | asset_url }}';
+
+  class RecentlyViewedProductsSection {
+    constructor() {
+      this.container = document.querySelector('[data-recently-viewed-container]');
+      this.storageKey = 'recentlyViewedProducts';
+      this.maxProducts = 5;
+      this.init();
+    }
+
+    init() {
+      if (!this.container) return;
+      this.loadAndRender();
+      
+      // Listen for product view events from RecentlyViewed tracker
+      document.addEventListener('product-viewed', () => {
+        this.loadAndRender();
+      });
+    }
+
+    loadAndRender() {
+      const productHandles = this.getStoredProducts();
+      if (productHandles.length === 0) {
+        this.container.style.display = 'none';
+        return;
+      }
+
+      this.container.style.display = 'block';
+      this.renderProducts(productHandles);
+    }
+
+    getStoredProducts() {
+      const stored = localStorage.getItem(this.storageKey);
+      return stored ? JSON.parse(stored) : [];
+    }
+
+    renderProducts(productHandles) {
+      const carousel = this.container.querySelector('.recently-viewed-carousel');
+      carousel.innerHTML = '';
+
+      productHandles.forEach((handle) => {
+        try {
+          // Create a fetch request to get product data
+          fetch(`/products/${handle}.json`)
+            .then(response => response.json())
+            .then(data => {
+              if (data.product) {
+                const product = data.product;
+                const item = this.createProductElement(product);
+                carousel.appendChild(item);
+              }
+            })
+            .catch(error => console.error('Error loading product:', error));
+        } catch (error) {
+          console.error('Error processing product handle:', error);
+        }
+      });
+
+      // Initialize carousel after a short delay to allow DOM to settle
+      setTimeout(() => this.initializeCarousel(), 100);
+    }
+          }
+        } catch (error) {
+          console.error('Error loading product:', error);
+        }
+      }
+
+      this.initializeCarousel();
+    }
+
+    createProductElement(product) {
+      const div = document.createElement('div');
+      div.className = 'recently-viewed-item';
+      
+      const image = product.featured_image || {};
+      const variant = product.variants ? product.variants[0] : {};
+      const price = variant.price ? (parseInt(variant.price) / 100).toFixed(2) : '0.00';
+      const comparePrice = variant.compare_at_price ? (parseInt(variant.compare_at_price) / 100).toFixed(2) : null;
+
+      let priceHtml = `<span class="price">${price}</span>`;
+      if (comparePrice && comparePrice > price) {
+        priceHtml = `
+          <span class="compare-price">${comparePrice}</span>
+          <span class="price">${price}</span>
+        `;
+      }
+
+      div.innerHTML = `
+        <a href="/products/${product.handle}" class="recently-viewed-image">
+          <img src="${image.src || ''}" alt="${product.title}" loading="lazy" />
+        </a>
+        <div class="recently-viewed-content">
+          <a href="/products/${product.handle}" class="recently-viewed-title">${product.title}</a>
+          <div class="recently-viewed-price">
+            ${priceHtml}
+          </div>
+          <button class="recently-viewed-add-to-cart" data-product-id="${product.id}" data-variant-id="${variant.id}">
+            Add to cart
+          </button>
+        </div>
+      `;
+
+      // Add to cart handler
+      div.querySelector('.recently-viewed-add-to-cart').addEventListener('click', (e) => {
+        this.addToCart(e);
+      });
+
+      return div;
+    }
+
+    addToCart(e) {
+      e.preventDefault();
+      const button = e.target;
+      const variantId = button.dataset.variantId;
+
+      const formData = new FormData();
+      formData.append('id', variantId);
+      formData.append('quantity', 1);
+
+      fetch(window.Shopify.routes.root + 'cart/add.js', {
+        method: 'POST',
+        body: formData
+      })
+      .then(response => response.json())
+      .then(data => {
+        // Dispatch custom event for cart drawer to open
+        document.dispatchEvent(new CustomEvent('cart:updated', { detail: data }));
+        button.textContent = 'Added!';
+        setTimeout(() => { button.textContent = 'Add to cart'; }, 2000);
+      })
+      .catch(error => console.error('Error adding to cart:', error));
+    }
+
+    initializeCarousel() {
+      const carousel = this.container.querySelector('.recently-viewed-carousel');
+      const items = carousel.querySelectorAll('.recently-viewed-item');
+      
+      if (items.length <= 1) return;
+
+      const prevBtn = this.container.querySelector('.carousel-prev');
+      const nextBtn = this.container.querySelector('.carousel-next');
+      let currentIndex = 0;
+
+      const scroll = (direction) => {
+        const itemWidth = items[0].offsetWidth + 16; // Include gap
+        currentIndex += direction;
+        
+        if (currentIndex < 0) currentIndex = 0;
+        if (currentIndex > items.length - 1) currentIndex = items.length - 1;
+        
+        carousel.style.transform = `translateX(-${currentIndex * itemWidth}px)`;
+        prevBtn.disabled = currentIndex === 0;
+        nextBtn.disabled = currentIndex === items.length - 1;
+      };
+
+      prevBtn.addEventListener('click', () => scroll(-1));
+      nextBtn.addEventListener('click', () => scroll(1));
+      
+      prevBtn.disabled = true;
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+      new RecentlyViewedProductsSection();
+    });
+  } else {
+    new RecentlyViewedProductsSection();
+  }
+</script>
+
+<div class="recently-viewed-section" data-recently-viewed-container style="display: none;">
+  <div class="recently-viewed-wrapper">
+    <h2 class="recently-viewed-title">Recently Viewed</h2>
+    <div class="carousel-controls">
+      <button class="carousel-prev" aria-label="Previous">‹</button>
+      <button class="carousel-next" aria-label="Next">›</button>
+    </div>
+  </div>
+  <div class="recently-viewed-carousel"></div>
+</div>
+
+{% stylesheet %}
+  .recently-viewed-section {
+    padding: 2rem 1rem;
+    background: var(--color-background-secondary, #f9f9f9);
+  }
+
+  .recently-viewed-wrapper {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1.5rem;
+  }
+
+  .recently-viewed-title {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .carousel-controls {
+    display: flex;
+    gap: 0.5rem;
+  }
+
+  .carousel-prev,
+  .carousel-next {
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--color-border, #ddd);
+    background: white;
+    cursor: pointer;
+    font-size: 1.5rem;
+    border-radius: 4px;
+    transition: all 0.2s ease;
+  }
+
+  .carousel-prev:hover:not(:disabled),
+  .carousel-next:hover:not(:disabled) {
+    background: var(--color-background, #f0f0f0);
+  }
+
+  .carousel-prev:disabled,
+  .carousel-next:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .recently-viewed-carousel {
+    display: flex;
+    gap: 1rem;
+    overflow: hidden;
+    transition: transform 0.3s ease;
+  }
+
+  .recently-viewed-item {
+    flex: 0 0 calc(25% - 0.75rem);
+    min-width: 200px;
+    border: 1px solid var(--color-border, #ddd);
+    border-radius: 8px;
+    overflow: hidden;
+    background: white;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  .recently-viewed-item:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+
+  .recently-viewed-image {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1;
+    overflow: hidden;
+    background: var(--color-background, #f9f9f9);
+  }
+
+  .recently-viewed-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s ease;
+  }
+
+  .recently-viewed-item:hover .recently-viewed-image img {
+    transform: scale(1.05);
+  }
+
+  .recently-viewed-content {
+    padding: 1rem;
+  }
+
+  .recently-viewed-title {
+    display: block;
+    font-size: 0.95rem;
+    font-weight: 500;
+    margin: 0 0 0.5rem 0;
+    text-decoration: none;
+    color: var(--color-text, #333);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .recently-viewed-title:hover {
+    text-decoration: underline;
+  }
+
+  .recently-viewed-price {
+    display: flex;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    font-size: 0.9rem;
+  }
+
+  .compare-price {
+    text-decoration: line-through;
+    color: var(--color-text-secondary, #999);
+  }
+
+  .price {
+    font-weight: 600;
+    color: var(--color-text, #333);
+  }
+
+  .recently-viewed-add-to-cart {
+    width: 100%;
+    padding: 0.75rem;
+    background: var(--color-button-bg, #000);
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: opacity 0.2s ease;
+  }
+
+  .recently-viewed-add-to-cart:hover {
+    opacity: 0.8;
+  }
+
+  @media (max-width: 1024px) {
+    .recently-viewed-item {
+      flex: 0 0 calc(33.333% - 0.67rem);
+    }
+  }
+
+  @media (max-width: 768px) {
+    .recently-viewed-item {
+      flex: 0 0 calc(50% - 0.5rem);
+      min-width: 150px;
+    }
+
+    .recently-viewed-title {
+      font-size: 1.1rem;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .recently-viewed-item {
+      flex: 0 0 calc(100% - 0rem);
+      min-width: 100%;
+    }
+
+    .recently-viewed-section {
+      padding: 1rem;
+    }
+  }
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "Recently Viewed Products",
+  "settings": [
+    {
+      "type": "paragraph",
+      "content": "Display recently viewed products from visitor's browsing history"
+    }
+  ]
+}
+{% endschema %}
